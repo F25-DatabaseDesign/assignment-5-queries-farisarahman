@@ -1,0 +1,227 @@
+-- assignment 5 
+USE united_helpers;
+
+-- 1) How many containers of antibiotics are currently available?
+-- Query 1
+SELECT quantityOnHand
+FROM item
+WHERE itemDescription = 'bottle of antibiotics';
+
+-- Answer: 100
+
+-- 2) Which volunteer(s), if any, have phone numbers that do not start with the number 2 and whose last name is not Jones. Query should retrieve names rather than ids
+-- Q2
+SELECT volunteerName
+FROM volunteer
+WHERE (volunteerTelephone IS NULL OR volunteerTelephone NOT LIKE '2%')
+AND volunteerName NOT LIKE '%Jones';
+-- Answer:
+-- Harry Smith
+-- Joan Simmons
+-- Gene Lewin
+
+-- 3) Which volunteer(s) are working on transporting tasks? Query should retrieve names rather than ids.
+-- Q3 
+SELECT volunteer.volunteerName
+FROM volunteer
+	INNER JOIN assignment
+		ON volunteer.volunteerId= assignment.volunteerId
+    INNER JOIN task
+		ON assignment.taskCode =task.taskCode
+	INNER JOIN task_type
+		ON task.taskTypeId = task_type.taskTypeId
+WHERE task_type.taskTypeName= 'transporting';
+-- Answer: George Brewer
+
+-- 4)Which task(s) have yet to be assigned to any volunteers (provide task descriptions, not the codes?
+-- Q4
+
+SELECT task.taskDescription
+FROM task 
+  LEFT JOIN assignment AS assign
+    ON task.taskCode = assign.taskCode
+WHERE
+  assign.volunteerId IS NULL;
+-- Answer: 
+-- 'Prepare 100 food packages'
+-- 'Take packages to the warehouse'
+
+
+-- 5)Which type(s) of package contain some kind of bottle? 
+-- Q5
+SELECT DISTINCT PT.packageTypeName
+FROM item 
+  INNER JOIN package_contents AS PC
+    ON item.itemId = PC.itemId
+  INNER JOIN package AS P
+    ON PC.packageId = P.packageId
+  INNER JOIN package_type AS PT
+    ON P.packageTypeId = PT.packageTypeId
+WHERE item.itemDescription LIKE '%bottle%';
+
+-- Answer: food and water
+
+-- 6) hich items, if any, are not in any packages? Answer should be item descriptions
+-- Q6
+SELECT item.itemDescription
+FROM item 
+  LEFT JOIN package_contents AS PC
+    ON item.itemId = PC.itemId
+WHERE PC.packageId IS NULL;
+
+-- Answer: bottle of antibiotics
+-- bottle of aspirin
+-- flashlight
+-- pack of bandages
+
+
+-- 7) Which task(s) are assigned to volunteer(s) that live in New Jersey (NJ)? Answer should have the task description and not the task ids.
+ -- Q7
+SELECT DISTINCT task.taskDescription
+FROM volunteer AS V
+  INNER JOIN assignment AS assign
+    ON V.volunteerId = assign.volunteerId
+  INNER JOIN task 
+    ON assign.taskCode = task.taskCode
+WHERE V.volunteerAddress LIKE '% NJ%';
+
+-- Answer: 
+-- 'Prepare 20 children\'s packages'
+-- 'Prepare 100 water packages'
+-- 'Prepare 5,000 packages'
+  
+  
+-- 8) Which volunteers began their assignments in the first half of 2021? Answer should have the volunteer names and not their ids.
+-- Q8
+SELECT DISTINCT V.volunteerName
+FROM assignment AS A
+  INNER JOIN volunteer AS V
+    ON A.volunteerId = V.volunteerId
+WHERE A.startDateTime >= '2021-01-01 00:00:00' AND A.startDateTime < '2021-07-01 00:00:00';
+
+-- Answer: 
+-- 'Joan Simmons'
+-- 'Chris Jordan'
+
+-- 9) Which volunteers have been assigned to tasks that include packing spam? Answer should have the volunteer names and not their ids.
+-- Q9 
+SELECT DISTINCT V.volunteerName
+FROM volunteer AS V
+  INNER JOIN assignment AS assign
+    ON V.volunteerId = assign.volunteerId
+  INNER JOIN task 
+    ON assign.taskCode = task.taskCode
+  INNER JOIN package AS P
+    ON task.taskCode = P.taskCode
+  INNER JOIN package_contents AS PC
+    ON P.packageId = PC.packageId
+  INNER JOIN item 
+    ON PC.itemId = item.itemId
+WHERE item.itemDescription = 'can of spam';
+
+-- Answer: 
+-- 'Julie White'
+-- 'Gerry Banks'
+
+
+-- 10) Which item(s) (if any) have a total value of exactly $100 in one package? Answer should be item descriptions.
+-- Q10
+
+SELECT item.itemDescription
+FROM item 
+  INNER JOIN package_contents AS PC
+    ON item.itemId = PC.itemId
+WHERE (item.itemValue * PC.itemQuantity) = 100.0;
+
+-- 11) How many volunteers are assigned to tasks with each different status? The answer lowest)
+-- Q11
+
+SELECT TS.taskStatusName,
+  COUNT(assign.volunteerId) AS VolunteerCount
+FROM
+  assignment AS assign
+  INNER JOIN task 
+    ON assign.taskCode = task.taskCode
+  INNER JOIN task_status AS TS
+    ON task.taskStatusId = TS.taskStatusId
+GROUP BY
+  TS.taskStatusName
+ORDER BY
+  VolunteerCount DESC;
+  
+-- Answer: 
+-- 'closed','4'
+-- 'ongoing','2'
+-- 'pending','1'
+
+
+-- 12) Which task creates the heaviest set of packages and what is the weight? Show both the taskCode and the weight (You should be able to do this without using any sub-queries).
+-- Q12
+
+SELECT task.taskCode,
+  SUM(P.packageWeight) AS TotalWeight
+FROM task
+  INNER JOIN package AS P
+    ON task.taskCode = P.taskCode
+GROUP BY task.taskCode
+ORDER BY TotalWeight DESC
+LIMIT 1;
+
+-- Answer: 
+-- 106 
+-- 308
+
+-- 13) How many tasks are there that do not have a type of “packing”?
+-- Q13
+
+SELECT
+  COUNT(task.taskCode)
+FROM task 
+  INNER JOIN task_type AS TT
+    ON task.taskTypeId = TT.taskTypeId
+WHERE TT.taskTypeName <> 'packing';
+
+-- Answer: 
+-- 3
+
+-- 14) Of those items that have been packed, which item (or items) were touched by fewer than 3 volunteers? Answer should be item descriptions.
+-- Q14
+SELECT item.itemDescription
+FROM item 
+  INNER JOIN package_contents AS PC
+    ON item.itemId = PC.itemId
+  INNER JOIN package AS P
+    ON PC.packageId = P.packageId
+  INNER JOIN task 
+    ON P.taskCode = task.taskCode
+  INNER JOIN assignment AS assign
+    ON task.taskCode = assign.taskCode
+GROUP BY item.itemDescription
+HAVING COUNT(DISTINCT assign.volunteerId) < 3;
+
+-- Answer: 
+-- 'can of spam'
+-- 'dried fruit'
+-- 'men's coat'
+-- 'sleeping bag'
+-- 'women's coat'
+
+-- 15) Which packages have a total value of more than 100? Show the packageIds and their value sorted from lowest to highest
+-- Q15
+SELECT P.packageId,
+  SUM(item.itemValue * PC.itemQuantity) AS TotalValue
+FROM package AS P
+  INNER JOIN package_contents AS PC
+    ON P.packageId = PC.packageId
+  INNER JOIN item 
+    ON PC.itemId = item.itemId
+GROUP BY P.packageId
+HAVING TotalValue > 100
+ORDER BY TotalValue ASC;
+
+-- Answer: 
+-- '6','150'
+-- '2','151'
+-- '4','350'
+-- '10','750'
+-- '5','1420'
